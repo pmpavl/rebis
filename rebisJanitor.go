@@ -1,6 +1,10 @@
 package rebis
 
-import "time"
+import (
+	"time"
+
+	"go.uber.org/zap"
+)
 
 type janitor struct {
 	Interval time.Duration
@@ -22,9 +26,14 @@ func stopJanitor(c *Cache) {
 
 func (j *janitor) run(c *cache) {
 	ticker := time.NewTicker(j.Interval)
+	c.logger.Info(
+		"START JANITOR",
+		zap.String("interval", j.Interval.String()),
+	)
 	for {
 		select {
 		case <-ticker.C:
+			c.logger.Debug("DELETE EXPIRED")
 			c.DeleteExpired()
 		case <-j.stop:
 			ticker.Stop()

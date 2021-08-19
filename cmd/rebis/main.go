@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/pmpavl/rebis"
 )
@@ -13,14 +14,29 @@ const (
 )
 
 func main() {
-	config, err := rebis.ConfigFrom(confDir)
+	rebisConfig, err := rebis.ConfigFrom(confDir)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
-	fmt.Printf("%+v\n", config)
+	fmt.Println(rebisConfig)
 
-	cache, err := rebis.NewCache(config)
-	cache.Set("foo", "bar", 0)
+	rebisCache, err := rebis.NewCache(rebisConfig)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
 
-	fmt.Println(cache.Get("foo"))
+	rebisCache.Set("0", rebisConfig, 0)
+	rebisCache.Set("-1", 123, -1)
+	rebisCache.Set("5s", 123, time.Duration(time.Second*5))
+	rebisCache.SetDefault("default", 654)
+
+	fmt.Println(rebisCache.Get("0"))
+	fmt.Println(rebisCache.Get("1"))
+	fmt.Println(rebisCache.Get("-1"))
+	fmt.Println(rebisCache.Get("5s"))
+	fmt.Println(rebisCache.GetWithExpiration("5s"))
+	fmt.Println(rebisCache.ItemCount())
+	fmt.Println(rebisCache.Items())
+	for true {
+	}
 }

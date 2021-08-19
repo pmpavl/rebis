@@ -22,14 +22,18 @@ func configDefault() *Config {
 	return &Config{
 		LoggerPath:        "-1",
 		LoggerLevel:       -1,
-		DefaultExpiration: -1,
-		CleanupInterval:   600,
+		DefaultExpiration: time.Duration(-1),
+		CleanupInterval:   time.Duration(time.Second * 60),
 	}
 }
 
-func ConfigCreateDefault(path string) error {
-	if !strings.Contains(path, ".yaml") || strings.Contains(path, "/") {
-		return errors.New(fmt.Sprintf("%s wrong configuration path", path))
+/*
+	Create default config for rebis cache container.
+	Default config is described in the function configDefault().
+*/
+func ConfigCreateDefault(filename string) error {
+	if !strings.Contains(filename, ".yaml") && !strings.Contains(filename, ".yml") {
+		return errors.New("config file should be in yaml format")
 	}
 	buf := new(bytes.Buffer)
 	c := configDefault()
@@ -38,15 +42,18 @@ func ConfigCreateDefault(path string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(path, []byte(buf.String()), 0644)
+	err = ioutil.WriteFile(filename, []byte(buf.String()), 0644)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func ConfigFrom(path string) (c *Config, err error) {
-	file, err := ioutil.ReadFile(path)
+/*
+	Parse config from yaml file configuration.
+*/
+func ConfigFrom(filename string) (c *Config, err error) {
+	file, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -54,16 +61,19 @@ func ConfigFrom(path string) (c *Config, err error) {
 	if err != nil {
 		return nil, err
 	}
-	err = c.validLoggerLevel()
+	err = c.validConfig()
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
-func (c *Config) validLoggerLevel() error {
+/*
+	Check the correctness of the compiled config.
+*/
+func (c *Config) validConfig() error {
 	if c.LoggerLevel < -1 || c.LoggerLevel > 5 {
-		return errors.New(fmt.Sprintf("%d wrong logger level", c.LoggerLevel))
+		return errors.New(fmt.Sprintf("%d is wrong logger level", c.LoggerLevel))
 	}
 	return nil
 }

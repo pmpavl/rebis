@@ -1,4 +1,4 @@
 loggerPath: "-1"
 loggerLevel: -1
 defaultExpiration: -1ns
-cleanupInterval: 600ns
+cleanupInterval: 1m0s
