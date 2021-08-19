@@ -3,7 +3,6 @@ package rebis
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"strings"
 	"time"
@@ -12,18 +11,33 @@ import (
 )
 
 type Config struct {
-	LoggerPath        string        `yaml:"loggerPath"`
-	LoggerLevel       int8          `yaml:"loggerLevel"`
+	Size              int           `yaml:"size"`
+	Backup            Backup        `yaml:"backup"`
 	DefaultExpiration time.Duration `yaml:"defaultExpiration"`
 	CleanupInterval   time.Duration `yaml:"cleanupInterval"`
+	Evicted           Evicted       `yaml:"evicted"`
+}
+type Backup struct {
+	Path     string        `yaml:"path,omitempty"`
+	Interval time.Duration `yaml:"interval,omitempty"`
+	InUse    bool          `yaml:"inUse"`
+}
+type Evicted struct {
+	Path  string `yaml:"path,omitempty"`
+	InUse bool   `yaml:"inUse"`
 }
 
 func configDefault() *Config {
 	return &Config{
-		LoggerPath:        "-1",
-		LoggerLevel:       -1,
+		Size: 1024,
+		Backup: Backup{
+			InUse: false,
+		},
 		DefaultExpiration: time.Duration(-1),
-		CleanupInterval:   time.Duration(time.Second * 60),
+		CleanupInterval:   time.Duration(time.Second * 5),
+		Evicted: Evicted{
+			InUse: false,
+		},
 	}
 }
 
@@ -61,19 +75,5 @@ func ConfigFrom(filename string) (c *Config, err error) {
 	if err != nil {
 		return nil, err
 	}
-	err = c.validConfig()
-	if err != nil {
-		return nil, err
-	}
 	return c, nil
-}
-
-/*
-	Check the correctness of the compiled config.
-*/
-func (c *Config) validConfig() error {
-	if c.LoggerLevel < -1 || c.LoggerLevel > 5 {
-		return errors.New(fmt.Sprintf("%d is wrong logger level", c.LoggerLevel))
-	}
-	return nil
 }

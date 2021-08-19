@@ -1,41 +1,38 @@
 package rebis
 
 import (
-	"errors"
-	"fmt"
-	"strconv"
-	"time"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"log"
+	"os"
 )
 
-func runLogger(c *cache, path string, level int8) (err error) {
-	if path != DefaultLoggerPath {
-		path += "logs" + strconv.Itoa(int(time.Now().Unix())) + ".log"
-	}
-	c.logger, err = zap.Config{
-		Encoding:    "console",
-		Level:       zap.NewAtomicLevelAt(zapcore.Level(level)),
-		OutputPaths: []string{path},
-		EncoderConfig: zapcore.EncoderConfig{
-			MessageKey:   "message",
-			LevelKey:     "level",
-			EncodeLevel:  zapcore.CapitalLevelEncoder,
-			TimeKey:      "time",
-			EncodeTime:   zapcore.RFC3339TimeEncoder,
-			CallerKey:    "caller",
-			EncodeCaller: zapcore.ShortCallerEncoder,
-		},
-	}.Build()
-	if err != nil {
-		return errors.New(fmt.Sprintf("wrong definition of zap logger %s", err.Error()))
-	}
+/*
+	Logger for realization printf
+*/
+type Logger interface {
+	Printf(format string, v ...interface{})
+}
 
-	c.logger.Info(
-		"START LOGGER",
-		zap.String("log path", path),
-		zap.String("log level", zap.NewAtomicLevelAt(zapcore.Level(level)).String()),
-	)
-	return nil
+/*
+	this is a safeguard, breaking on compile time in case
+	log.Logger` does not adhere to our `Logger` interface.
+	see https://golang.org/doc/faq#guarantee_satisfies_interface
+*/
+var _ Logger = &log.Logger{}
+
+/*
+	DefaultLogger returns a `Logger` implementation
+	backed by stdlib's log
+*/
+func DefaultLogger() *log.Logger {
+	return log.New(os.Stdout, "", log.LstdFlags)
+}
+
+/*
+	ChangeLogger override the logger specified in the
+	cahce structure if it matches the Logger interface
+*/
+func (c *cache) ChangeLogger(custom Logger) {
+	if custom != nil {
+		c.logger = custom
+	}
 }

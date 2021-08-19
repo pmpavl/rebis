@@ -21,7 +21,7 @@ func (c *cache) Save(w io.Writer) (err error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	for _, v := range c.items {
-		fmt.Printf("%T\n",v.Value)
+		fmt.Printf("%T\n", v.Value)
 		gob.Register(v.Value)
 	}
 	err = enc.Encode(&c.items)
@@ -59,6 +59,7 @@ func (c *cache) Load(r io.Reader) error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		for k, v := range items {
+			fmt.Println(k)
 			ov, found := c.items[k]
 			if !found || ov.Expired() {
 				c.items[k] = v

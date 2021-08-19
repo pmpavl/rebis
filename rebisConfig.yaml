@@ -1,8 +1,10 @@
-# Way to save logs, if -1 then logged in os.Stdout
-loggerPath: ./logs/
-# Level of zap logger
-loggerLevel: -1
-# Default lifetime item, if -1ns then item never expires
+size: 500
+backup:
+  path: "./backup"
+  interval: 1s
+  inUse: true
 defaultExpiration: -1ns
-# Cleaning interval by the janitor
-cleanupInterval: 1s
+cleanupInterval: 1m0s
+evicted:
+  path: "./evicted"
+  inUse: true

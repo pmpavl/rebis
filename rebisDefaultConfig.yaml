@@ -1,4 +1,7 @@
-loggerPath: "-1"
-loggerLevel: -1
+size: 1024
+backup:
+    inUse: false
 defaultExpiration: -1ns
-cleanupInterval: 1m0s
+cleanupInterval: 5s
+evicted:
+    inUse: false

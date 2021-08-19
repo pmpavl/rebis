@@ -1,12 +1,12 @@
 package rebis
 
 import (
+	"encoding/gob"
 	"fmt"
+	"io"
 	"runtime"
 	"sync"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 type Item struct {
@@ -23,7 +23,8 @@ type cache struct {
 	items             map[string]Item
 	defaultExpiration time.Duration
 	janitor           *janitor
-	logger            *zap.Logger
+	backup            *backup
+	logger            Logger
 	onEvicted         func(string, interface{})
 }
 
@@ -46,79 +47,39 @@ func NewCache(config *Config) (*Cache, error) {
 }
 
 /*
-	Init cache struct.
-	Run zap logger, if -1 log write in stderr.
-	Run janitor, if <= 0 janitor does not start.
+	Init cache struct with default logger (stdout).
+
+	Run janitor, if CleanupInterval <= 0 janitor does not start.
 */
 func newCache(config *Config, items map[string]Item) (*Cache, error) {
 	c := &cache{
 		defaultExpiration: config.DefaultExpiration,
 		items:             items,
+		logger:            DefaultLogger(),
 	}
 	C := &Cache{c}
+	c.logger.Printf("initialize new cache with defaul expiration duration: %s and items count: %d",
+		c.defaultExpiration,
+		len(c.items),
+	)
 
-	logPath := config.LoggerPath
-	if logPath == "-1" {
-		logPath = DefaultLoggerPath
-	}
-	err := runLogger(c, logPath, config.LoggerLevel)
-	if err != nil {
-		return nil, err
+	if config.Backup.InUse {
+		runBackup(c, config.Backup.Path, config.Backup.Interval)
 	}
 
 	if ci := config.CleanupInterval; ci > 0 {
 		runJanitor(c, ci)
-		runtime.SetFinalizer(C, stopJanitor)
 	}
 
-	c.logger.Info(
-		"CREATE NEW CACHE",
-		zap.String("default expiration", c.defaultExpiration.String()),
-		zap.String("cleanup interval", c.janitor.Interval.String()),
-		zap.String("log path", logPath),
-		zap.Int8("log level", config.LoggerLevel),
-	)
+	runtime.SetFinalizer(C, nil)
 	return C, nil
-}
-
-/*
-	Returns the number of items in the cache. This may include items that have
-	expired, but have not yet been cleaned up.
-*/
-func (c *cache) ItemCount() int {
-	c.mu.RLock()
-	n := len(c.items)
-	c.mu.RUnlock()
-	c.logger.Info(
-		"COUNT",
-		zap.Int("items count", n),
-	)
-	return n
-}
-
-/*
-	Copies all unexpired items in the cache into a new map and returns it.
-*/
-func (c *cache) Items() map[string]Item {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	m := make(map[string]Item, len(c.items))
-	now := time.Now().UnixNano()
-	for k, v := range c.items {
-		if v.Expiration > 0 {
-			if now > v.Expiration {
-				continue
-			}
-		}
-		m[k] = v
-	}
-	return m
 }
 
 /*
 	Delete all expired items from the cache.
 */
 func (c *cache) DeleteExpired() {
+	c.logger.Printf("start delete expired")
 	var evictedItems []keyAndValue
 	now := time.Now().UnixNano()
 	c.mu.Lock()
@@ -144,11 +105,75 @@ func (c *cache) delete(k string) (interface{}, bool) {
 		}
 	}
 	delete(c.items, k)
-	c.logger.Debug(
-		"DELETE",
-		zap.String("key", k),
-	)
 	return nil, false
+}
+
+func (c *cache) BackupSave() {
+	enc := gob.NewEncoder(c.backup.File)
+	defer func() {
+		if x := recover(); x != nil {
+
+		}
+	}()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, v := range c.items {
+		fmt.Printf("%T\n", v.Value)
+		gob.Register(v.Value)
+	}
+	err := enc.Encode(&c.items)
+	if err != nil {
+		c.logger.Printf(err.Error())
+	}
+	return
+}
+
+func (c *cache) BackupLoad(r io.Reader) error {
+	dec := gob.NewDecoder(r)
+	items := map[string]Item{}
+	err := dec.Decode(&items)
+	if err == nil {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		for k, v := range items {
+			ov, found := c.items[k]
+			if !found || ov.Expired() {
+				c.items[k] = v
+			}
+		}
+	}
+	fmt.Println(c)
+	return err
+}
+
+/*
+	Returns the number of items in the cache. This may include items that have
+	expired, but have not yet been cleaned up.
+*/
+func (c *cache) ItemCount() int {
+	c.mu.RLock()
+	n := len(c.items)
+	c.mu.RUnlock()
+	return n
+}
+
+/*
+	Copies all unexpired items in the cache into a new map and returns it.
+*/
+func (c *cache) Items() map[string]Item {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	m := make(map[string]Item, len(c.items))
+	now := time.Now().UnixNano()
+	for k, v := range c.items {
+		if v.Expiration > 0 {
+			if now > v.Expiration {
+				continue
+			}
+		}
+		m[k] = v
+	}
+	return m
 }
 
 /*
@@ -170,12 +195,7 @@ func (c *cache) Set(k string, x interface{}, d time.Duration) {
 		Expiration: e,
 	}
 	c.mu.Unlock()
-	c.logger.Debug(
-		"SET",
-		zap.String("key", k),
-		zap.String("value", fmt.Sprint(x)),
-		zap.String("expiration", d.String()),
-	)
+	c.logger.Printf("set %s -> %v -> %s", k, x, d)
 }
 
 /*
@@ -194,20 +214,10 @@ func (c *cache) Add(k string, x interface{}, d time.Duration) error {
 	_, found := c.get(k)
 	if found {
 		c.mu.Unlock()
-		c.logger.Debug(
-			"ADD",
-			zap.String("item already exists", k),
-		)
 		return fmt.Errorf("Item %s already exists", k)
 	}
 	c.set(k, x, d)
 	c.mu.Unlock()
-	c.logger.Debug(
-		"ADD",
-		zap.String("key", k),
-		zap.String("value", fmt.Sprint(x)),
-		zap.String("expiration", d.String()),
-	)
 	return nil
 }
 
@@ -247,26 +257,13 @@ func (c *cache) Get(k string) (interface{}, bool) {
 	defer c.mu.RUnlock()
 	item, found := c.items[k]
 	if !found {
-		c.logger.Debug(
-			"GET",
-			zap.String("not found", k),
-		)
 		return nil, false
 	}
 	if item.Expiration > 0 {
 		if time.Now().UnixNano() > item.Expiration {
-			c.logger.Debug(
-				"GET",
-				zap.String("expired", k),
-			)
 			return nil, false
 		}
 	}
-	c.logger.Debug(
-		"GET",
-		zap.String("key", k),
-		zap.String("value", fmt.Sprint(item.Value)),
-	)
 	return item.Value, true
 }
 
@@ -281,27 +278,13 @@ func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 	defer c.mu.RUnlock()
 	item, found := c.items[k]
 	if !found {
-		c.logger.Debug(
-			"GET",
-			zap.String("not found", k),
-		)
 		return nil, time.Time{}, false
 	}
 	if item.Expiration > 0 {
 		if time.Now().UnixNano() > item.Expiration {
-			c.logger.Debug(
-				"GET",
-				zap.String("expired", k),
-			)
 			return nil, time.Time{}, false
 		}
 	}
-	c.logger.Debug(
-		"GET",
-		zap.String("key", k),
-		zap.String("value", fmt.Sprint(item.Value)),
-		zap.Time("expiration", time.Unix(0, item.Expiration)),
-	)
 	return item.Value, time.Unix(0, item.Expiration), true
 }
 
@@ -314,19 +297,9 @@ func (c *cache) Replace(k string, x interface{}, d time.Duration) error {
 	_, found := c.get(k)
 	if !found {
 		c.mu.Unlock()
-		c.logger.Debug(
-			"REPLACE",
-			zap.String("item key doesn't exist", k),
-		)
 		return fmt.Errorf("item %s doesn't exist", k)
 	}
 	c.set(k, x, d)
 	c.mu.Unlock()
-	c.logger.Debug(
-		"REPLACE",
-		zap.String("key", k),
-		zap.String("value", fmt.Sprint(x)),
-		zap.String("expiration", d.String()),
-	)
 	return nil
 }
