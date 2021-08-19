@@ -114,6 +114,7 @@ func (c *cache) Items() map[string]Item {
 	}
 	return m
 }
+
 /*
 	Delete all expired items from the cache.
 */
@@ -185,6 +186,59 @@ func (c *cache) SetDefault(k string, x interface{}) {
 }
 
 /*
+	Add an item to the cache only if an item doesn't already exist for the given
+	key, or if the existing item has expired. Returns an error otherwise.
+*/
+func (c *cache) Add(k string, x interface{}, d time.Duration) error {
+	c.mu.Lock()
+	_, found := c.get(k)
+	if found {
+		c.mu.Unlock()
+		c.logger.Debug(
+			"ADD",
+			zap.String("item already exists", k),
+		)
+		return fmt.Errorf("Item %s already exists", k)
+	}
+	c.set(k, x, d)
+	c.mu.Unlock()
+	c.logger.Debug(
+		"ADD",
+		zap.String("key", k),
+		zap.String("value", fmt.Sprint(x)),
+		zap.String("expiration", d.String()),
+	)
+	return nil
+}
+
+func (c *cache) get(k string) (interface{}, bool) {
+	item, found := c.items[k]
+	if !found {
+		return nil, false
+	}
+	if item.Expiration > 0 {
+		if time.Now().UnixNano() > item.Expiration {
+			return nil, false
+		}
+	}
+	return item.Value, true
+}
+
+func (c *cache) set(k string, x interface{}, d time.Duration) {
+	var e int64
+	if d == DefaultExpiration {
+		d = c.defaultExpiration
+	}
+	if d > 0 {
+		e = time.Now().Add(d).UnixNano()
+	}
+	c.items[k] = Item{
+		Value:      x,
+		Expiration: e,
+	}
+}
+
+/*
 	Get an item from the cache. Returns the item or nil, and a bool indicating
 	whether the key was found.
 */
@@ -249,4 +303,30 @@ func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 		zap.Time("expiration", time.Unix(0, item.Expiration)),
 	)
 	return item.Value, time.Unix(0, item.Expiration), true
+}
+
+/*
+	Set a new value for the cache key only if it already exists, and the existing
+	item hasn't expired. Returns an error otherwise.
+*/
+func (c *cache) Replace(k string, x interface{}, d time.Duration) error {
+	c.mu.Lock()
+	_, found := c.get(k)
+	if !found {
+		c.mu.Unlock()
+		c.logger.Debug(
+			"REPLACE",
+			zap.String("item key doesn't exist", k),
+		)
+		return fmt.Errorf("item %s doesn't exist", k)
+	}
+	c.set(k, x, d)
+	c.mu.Unlock()
+	c.logger.Debug(
+		"REPLACE",
+		zap.String("key", k),
+		zap.String("value", fmt.Sprint(x)),
+		zap.String("expiration", d.String()),
+	)
+	return nil
 }
