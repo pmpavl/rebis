@@ -56,7 +56,7 @@ func ConfigCreateDefault(filename string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(filename, []byte(buf.String()), 0644)
+	err = ioutil.WriteFile(filename, buf.Bytes(), 0644)
 	if err != nil {
 		return err
 	}

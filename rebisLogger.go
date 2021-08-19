@@ -14,7 +14,7 @@ type Logger interface {
 
 /*
 	this is a safeguard, breaking on compile time in case
-	log.Logger` does not adhere to our `Logger` interface.
+	log.Logger does not adhere to our Logger interface.
 	see https://golang.org/doc/faq#guarantee_satisfies_interface
 */
 var _ Logger = &log.Logger{}

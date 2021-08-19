@@ -24,11 +24,20 @@ func main() {
 		log.Fatalf(err.Error())
 	}
 
-	time.Sleep(1 * time.Second)
+	rebisCache.Set("1", 10, time.Duration(time.Second*100))
+	rebisCache.Set("2", 20, time.Duration(time.Second*0))
+	rebisCache.Set("3", 30, time.Duration(time.Second*-1))
+	rebisCache.SetDefault("4", 40)
 
+	rebisCache.Add("5", 50, time.Duration(time.Second*-1))
 
-	rebisCache.LoadFile("123.gob")
-	fmt.Println(rebisCache.Items())
+	fmt.Println(rebisCache.Get("2"))
+	fmt.Println(rebisCache.GetWithExpiration("1"))
+	rebisCache.Replace("3", 300, time.Duration(time.Second*100))
+
+	fmt.Println(rebisCache.Decrement("1", 10))
+	fmt.Println(rebisCache.GetWithExpiration("1"))
+
 	for true {
 
 	}

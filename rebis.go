@@ -3,7 +3,7 @@ package rebis
 import (
 	"encoding/gob"
 	"fmt"
-	"io"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -36,7 +36,6 @@ type keyAndValue struct {
 const (
 	NoExpiration      time.Duration = -1
 	DefaultExpiration time.Duration = 0
-	DefaultLoggerPath string        = "stderr"
 )
 
 /*
@@ -48,6 +47,8 @@ func NewCache(config *Config) (*Cache, error) {
 
 /*
 	Init cache struct with default logger (stdout).
+
+	Run backup if inUse = true in config file with backup interval
 
 	Run janitor, if CleanupInterval <= 0 janitor does not start.
 */
@@ -79,7 +80,6 @@ func newCache(config *Config, items map[string]Item) (*Cache, error) {
 	Delete all expired items from the cache.
 */
 func (c *cache) DeleteExpired() {
-	c.logger.Printf("start delete expired")
 	var evictedItems []keyAndValue
 	now := time.Now().UnixNano()
 	c.mu.Lock()
@@ -97,6 +97,10 @@ func (c *cache) DeleteExpired() {
 	}
 }
 
+/*
+	Delete item by key, return his value and if have evicted function
+	then true else false.
+*/
 func (c *cache) delete(k string) (interface{}, bool) {
 	if c.onEvicted != nil {
 		if v, found := c.items[k]; found {
@@ -108,30 +112,68 @@ func (c *cache) delete(k string) (interface{}, bool) {
 	return nil, false
 }
 
+/*
+	Saving backup to the path defined in the structure.
+*/
 func (c *cache) BackupSave() {
 	enc := gob.NewEncoder(c.backup.File)
 	defer func() {
 		if x := recover(); x != nil {
-
+			c.logger.Printf("error registering item types with Gob library")
 		}
 	}()
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	for _, v := range c.items {
-		fmt.Printf("%T\n", v.Value)
 		gob.Register(v.Value)
 	}
 	err := enc.Encode(&c.items)
 	if err != nil {
 		c.logger.Printf(err.Error())
 	}
-	return
 }
 
-func (c *cache) BackupLoad(r io.Reader) error {
-	dec := gob.NewDecoder(r)
+/*
+	Saving backup by filename path.
+*/
+func (c *cache) BackupSaveFile(filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		c.logger.Printf(err.Error())
+		return err
+	}
+	defer file.Close()
+	enc := gob.NewEncoder(file)
+	defer func() {
+		if x := recover(); x != nil {
+			c.logger.Printf("error registering item types with Gob library")
+		}
+	}()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, v := range c.items {
+		gob.Register(v.Value)
+	}
+	err = enc.Encode(&c.items)
+	if err != nil {
+		c.logger.Printf(err.Error())
+	}
+	return err
+}
+
+/*
+	Recovery backup by path defined in the structure.
+*/
+func (c *cache) BackupRecovery() {
+	file, err := os.Open(c.backup.Path)
+	if err != nil {
+		c.logger.Printf(err.Error())
+	}
+	defer file.Close()
+
+	dec := gob.NewDecoder(file)
 	items := map[string]Item{}
-	err := dec.Decode(&items)
+	err = dec.Decode(&items)
 	if err == nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -141,8 +183,37 @@ func (c *cache) BackupLoad(r io.Reader) error {
 				c.items[k] = v
 			}
 		}
+		return
 	}
-	fmt.Println(c)
+	c.logger.Printf(err.Error())
+}
+
+/*
+	Recovery backup by filename path.
+*/
+func (c *cache) BackupRecoveryFile(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		c.logger.Printf(err.Error())
+		return err
+	}
+	defer file.Close()
+
+	dec := gob.NewDecoder(file)
+	items := map[string]Item{}
+	err = dec.Decode(&items)
+	if err == nil {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		for k, v := range items {
+			ov, found := c.items[k]
+			if !found || ov.Expired() {
+				c.items[k] = v
+			}
+		}
+		return nil
+	}
+	c.logger.Printf(err.Error())
 	return err
 }
 
@@ -214,10 +285,11 @@ func (c *cache) Add(k string, x interface{}, d time.Duration) error {
 	_, found := c.get(k)
 	if found {
 		c.mu.Unlock()
-		return fmt.Errorf("Item %s already exists", k)
+		return fmt.Errorf("item %s already exists", k)
 	}
 	c.set(k, x, d)
 	c.mu.Unlock()
+	c.logger.Printf("add %s -> %v -> %s", k, x, d)
 	return nil
 }
 
@@ -264,6 +336,7 @@ func (c *cache) Get(k string) (interface{}, bool) {
 			return nil, false
 		}
 	}
+	c.logger.Printf("get %s -> %v", k, item.Value)
 	return item.Value, true
 }
 
@@ -285,6 +358,7 @@ func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 			return nil, time.Time{}, false
 		}
 	}
+	c.logger.Printf("get with %s -> %v", k, item.Value)
 	return item.Value, time.Unix(0, item.Expiration), true
 }
 
@@ -301,5 +375,6 @@ func (c *cache) Replace(k string, x interface{}, d time.Duration) error {
 	}
 	c.set(k, x, d)
 	c.mu.Unlock()
+	c.logger.Printf("replace with %s -> %v -> %s", k, x, d)
 	return nil
 }
