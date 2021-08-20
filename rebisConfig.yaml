@@ -1,0 +1,10 @@
+size: 500
+backup:
+  path: "./backup"
+  interval: 30s
+  inUse: true
+defaultExpiration: -1ns
+cleanupInterval: 30s
+evicted:
+  path: "./evicted"
+  inUse: true

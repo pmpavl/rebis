@@ -1,0 +1,7 @@
+size: 1024
+backup:
+    inUse: false
+defaultExpiration: -1ns
+cleanupInterval: 5s
+evicted:
+    inUse: false
