@@ -1,7 +1,7 @@
 size: 500
 backup:
   path: "./backup"
-  interval: 30s
+  interval: 5s
   inUse: true
 defaultExpiration: -1ns
 cleanupInterval: 30s

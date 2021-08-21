@@ -1,12 +1,14 @@
 package rebis
 
 import (
-	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/pquerna/ffjson/ffjson"
 )
 
 type Item struct {
@@ -115,106 +117,68 @@ func (c *cache) delete(k string) (interface{}, bool) {
 /*
 	Saving backup to the path defined in the structure.
 */
-func (c *cache) BackupSave() {
-	enc := gob.NewEncoder(c.backup.File)
-	defer func() {
-		if x := recover(); x != nil {
-			c.logger.Printf("error registering item types with Gob library")
-		}
-	}()
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, v := range c.items {
-		gob.Register(v.Value)
-	}
-	err := enc.Encode(&c.items)
-	if err != nil {
-		c.logger.Printf(err.Error())
-	}
+func (c *cache) BackupSave() error {
+	return c.BackupSaveFile(c.backup.Path)
 }
 
 /*
 	Saving backup by filename path.
 */
 func (c *cache) BackupSaveFile(filename string) error {
-	file, err := os.Create(filename)
+	buf, err := ffjson.Marshal(&c.items)
+	if err != nil {
+		c.logger.Printf(err.Error())
+		return err
+	}
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		c.logger.Printf(err.Error())
 		return err
 	}
 	defer file.Close()
-	enc := gob.NewEncoder(file)
-	defer func() {
-		if x := recover(); x != nil {
-			c.logger.Printf("error registering item types with Gob library")
-		}
-	}()
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, v := range c.items {
-		gob.Register(v.Value)
-	}
-	err = enc.Encode(&c.items)
+	_, err = file.Write(buf)
 	if err != nil {
 		c.logger.Printf(err.Error())
+		return err
 	}
-	return err
+
+	ffjson.Pool(buf)
+	return nil
 }
 
 /*
 	Recovery backup by path defined in the structure.
 */
-func (c *cache) BackupRecovery() {
-	file, err := os.Open(c.backup.Path)
-	if err != nil {
-		c.logger.Printf(err.Error())
-	}
-	defer file.Close()
-
-	dec := gob.NewDecoder(file)
-	items := map[string]Item{}
-	err = dec.Decode(&items)
-	if err == nil {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		for k, v := range items {
-			ov, found := c.items[k]
-			if !found || ov.Expired() {
-				c.items[k] = v
-			}
-		}
-		return
-	}
-	c.logger.Printf(err.Error())
+func (c *cache) BackupRecovery() error {
+	return c.BackupRecoveryFile(c.backup.Path)
 }
 
 /*
 	Recovery backup by filename path.
 */
 func (c *cache) BackupRecoveryFile(filename string) error {
-	file, err := os.Open(filename)
+	buf, err := ioutil.ReadFile(filename)
 	if err != nil {
 		c.logger.Printf(err.Error())
 		return err
 	}
-	defer file.Close()
 
-	dec := gob.NewDecoder(file)
 	items := map[string]Item{}
-	err = dec.Decode(&items)
-	if err == nil {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		for k, v := range items {
-			ov, found := c.items[k]
-			if !found || ov.Expired() {
-				c.items[k] = v
-			}
-		}
-		return nil
+	err = ffjson.Unmarshal(buf, &items)
+	if err != nil {
+		c.logger.Printf(err.Error())
+		return err
 	}
-	c.logger.Printf(err.Error())
-	return err
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for k, v := range items {
+		ov, found := c.items[k]
+		if !found || ov.Expired() {
+			c.items[k] = v
+		}
+	}
+	return nil
 }
 
 /*

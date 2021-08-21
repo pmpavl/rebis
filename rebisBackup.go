@@ -7,7 +7,6 @@ import (
 )
 
 type backup struct {
-	File     *os.File
 	Path     string
 	Interval time.Duration
 	stop     chan bool
@@ -16,13 +15,13 @@ type backup struct {
 func runBackup(c *cache, bp string, bi time.Duration) {
 	var err error
 	b := &backup{
-		Path:     bp + "/backup" + strconv.Itoa(int(time.Now().Unix())) + ".gob",
+		Path:     bp + "/backup" + strconv.Itoa(int(time.Now().Unix())) + ".json",
 		Interval: bi,
 		stop:     make(chan bool),
 	}
-	b.File, err = os.Create(b.Path)
+	_, err = os.Create(b.Path)
 	if err != nil {
-		c.logger.Printf("can not open gob file %s", err.Error())
+		c.logger.Printf("can not open json file %s", err.Error())
 	}
 
 	c.backup = b
