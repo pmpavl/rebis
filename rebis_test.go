@@ -121,7 +121,7 @@ func TestCacheTimes(t *testing.T) {
 		t.Error("Did not find d even though it was set to expire later than the default")
 	}
 
-	<-time.After(20 * time.Millisecond)
+	<-time.After(50 * time.Millisecond)
 	tc.Get("d")
 	_, _, found = tc.GetWithExpiration("d")
 	if found {
