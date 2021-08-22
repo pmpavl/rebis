@@ -38,7 +38,7 @@ func configDefault() *Config {
 			InUse: false,
 		},
 		DefaultExpiration: time.Duration(-1),
-		CleanupInterval:   time.Duration(time.Second * 5),
+		CleanupInterval:   time.Duration(time.Minute * 5),
 		LogAll:            false,
 		Evicted:           false,
 	}
