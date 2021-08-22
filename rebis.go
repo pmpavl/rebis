@@ -183,7 +183,9 @@ func (c *cache) BackupSave() error {
 	Saving backup by filename path.
 */
 func (c *cache) BackupSaveFile(filename string) error {
+	c.mu.Lock()
 	buf, err := ffjson.Marshal(&c.items)
+	c.mu.Unlock()
 	if err != nil {
 		return err
 	}
