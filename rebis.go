@@ -12,11 +12,13 @@ import (
 	"github.com/pquerna/ffjson/ffjson"
 )
 
+// Item is element of cache.
 type Item struct {
 	Value      interface{}
 	Expiration int64
 }
 
+// Cache is wrapper over hidden cache
 type Cache struct {
 	*cache
 }
@@ -40,20 +42,20 @@ type keyAndValue struct {
 }
 
 const (
-	NoExpiration      time.Duration = -1
-	DefaultExpiration time.Duration = 0
+	NoExpiration      time.Duration = -1 // if expiration in Item = -1, then element never delete
+	DefaultExpiration time.Duration = 0  // if expiration in Set func = 0, then element expiration = config.defaultExpiration
 	sizeItem          uintptr       = unsafe.Sizeof(Item{})
 )
 
 /*
-	Create new rebis cache from config struct.
+	NewCache create new rebis cache from config struct.
 */
 func NewCache(config *Config) (*Cache, error) {
 	return newCache(config, make(map[string]Item))
 }
 
 /*
-	Create new rebis cache from config struct and reuse map items.
+	NewCacheFrom create new rebis cache from config struct and reuse map items.
 */
 func NewCacheFrom(config *Config, items map[string]Item) (*Cache, error) {
 	return newCache(config, items)

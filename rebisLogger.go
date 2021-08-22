@@ -5,9 +5,7 @@ import (
 	"os"
 )
 
-/*
-	Logger for realization printf
-*/
+//	Logger realization Printf func for log in output.
 type Logger interface {
 	Printf(format string, v ...interface{})
 }
