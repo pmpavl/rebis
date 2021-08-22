@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/pmpavl/rebis"
@@ -12,6 +13,7 @@ const (
 )
 
 func main() {
+	// rebis.ConfigCreateDefault(confDef)
 	rebisConfig, err := rebis.ConfigFrom(confDir)
 	if err != nil {
 		log.Fatalf(err.Error())
@@ -21,15 +23,15 @@ func main() {
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
+	// start := time.Now()
+	// for i := 0; i < 100; i++ {
+	// 	rebisCache.Set(strconv.Itoa(i), i, 0)
+	// }
+	// end := time.Since(start)
+	// time.Sleep(time.Second * 2)
+	// fmt.Println(end)
 
-	// rebisCache.Set("1", 10, time.Duration(time.Second*500))
-	// rebisCache.Set("2", 20, time.Duration(time.Second*500))
-	// rebisCache.Set("3", 30, time.Duration(time.Second*500))
-	// rebisCache.SetDefault("4", 500)
-
-	// rebisCache.Add("5", 50, time.Duration(time.Second*600))
-
-	// fmt.Println(rebisCache.Get("2"))
+	fmt.Println(rebisCache.Get("2"))
 	// fmt.Println(rebisCache.GetWithExpiration("1"))
 	// rebisCache.Replace("3", 300, time.Duration(time.Second*500))
 
@@ -41,8 +43,14 @@ func main() {
 	// rebisCache.BackupRecovery()
 	// fmt.Println(rebisCache.Items())
 
-	rebisCache.BackupRecoveryFile("./backup/backup1629531679.json")
+	// err = rebisCache.BackupRecoveryFile("./backup/backup1629630459.json")
+	// fmt.Println(err)
 
+	// rebisCache.ItemCount()
+	// rebisCache.Items()
+
+	// time.Sleep(time.Second * 3)
+	// fmt.Println(a)
 
 	for true {
 

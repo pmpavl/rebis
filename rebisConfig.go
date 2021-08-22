@@ -11,20 +11,17 @@ import (
 )
 
 type Config struct {
-	Size              int           `yaml:"size"`
+	Size              uintptr       `yaml:"size"`
 	Backup            Backup        `yaml:"backup"`
 	DefaultExpiration time.Duration `yaml:"defaultExpiration"`
 	CleanupInterval   time.Duration `yaml:"cleanupInterval"`
-	Evicted           Evicted       `yaml:"evicted"`
+	LogAll            bool          `yaml:"logAll"`
+	Evicted           bool          `yaml:"evicted"`
 }
 type Backup struct {
 	Path     string        `yaml:"path,omitempty"`
 	Interval time.Duration `yaml:"interval,omitempty"`
 	InUse    bool          `yaml:"inUse"`
-}
-type Evicted struct {
-	Path  string `yaml:"path,omitempty"`
-	InUse bool   `yaml:"inUse"`
 }
 
 func configDefault() *Config {
@@ -35,9 +32,8 @@ func configDefault() *Config {
 		},
 		DefaultExpiration: time.Duration(-1),
 		CleanupInterval:   time.Duration(time.Second * 5),
-		Evicted: Evicted{
-			InUse: false,
-		},
+		LogAll:            false,
+		Evicted:           false,
 	}
 }
 

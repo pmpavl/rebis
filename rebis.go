@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/pquerna/ffjson/ffjson"
 )
@@ -21,12 +22,15 @@ type Cache struct {
 }
 
 type cache struct {
+	maxSize           uintptr
+	size              uintptr
 	mu                sync.RWMutex
 	items             map[string]Item
 	defaultExpiration time.Duration
 	janitor           *janitor
 	backup            *backup
 	logger            Logger
+	logAll            bool
 	onEvicted         func(string, interface{})
 }
 
@@ -38,6 +42,7 @@ type keyAndValue struct {
 const (
 	NoExpiration      time.Duration = -1
 	DefaultExpiration time.Duration = 0
+	sizeItem          uintptr       = unsafe.Sizeof(Item{})
 )
 
 /*
@@ -56,15 +61,25 @@ func NewCache(config *Config) (*Cache, error) {
 */
 func newCache(config *Config, items map[string]Item) (*Cache, error) {
 	c := &cache{
+		maxSize:           config.Size * 1024,
+		size:              0,
 		defaultExpiration: config.DefaultExpiration,
 		items:             items,
 		logger:            DefaultLogger(),
+		logAll:            config.LogAll,
 	}
 	C := &Cache{c}
-	c.logger.Printf("initialize new cache with defaul expiration duration: %s and items count: %d",
+	c.logIf("initialize new cache with defaul expiration duration: %s, items count: %d, max count: %d",
 		c.defaultExpiration,
 		len(c.items),
+		c.maxSize/sizeItem,
 	)
+
+	if config.Evicted {
+		c.onEvicted = func(s string, i interface{}) {
+			c.logIf("delete evicted: %s -> %v", s, i)
+		}
+	}
 
 	if config.Backup.InUse {
 		runBackup(c, config.Backup.Path, config.Backup.Interval)
@@ -82,6 +97,7 @@ func newCache(config *Config, items map[string]Item) (*Cache, error) {
 	Delete all expired items from the cache.
 */
 func (c *cache) DeleteExpired() {
+	c.logIf("delete expired")
 	var evictedItems []keyAndValue
 	now := time.Now().UnixNano()
 	c.mu.Lock()
@@ -94,6 +110,7 @@ func (c *cache) DeleteExpired() {
 		}
 	}
 	c.mu.Unlock()
+
 	for _, v := range evictedItems {
 		c.onEvicted(v.key, v.value)
 	}
@@ -127,21 +144,18 @@ func (c *cache) BackupSave() error {
 func (c *cache) BackupSaveFile(filename string) error {
 	buf, err := ffjson.Marshal(&c.items)
 	if err != nil {
-		c.logger.Printf(err.Error())
 		return err
 	}
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
-		c.logger.Printf(err.Error())
 		return err
 	}
 	defer file.Close()
 	_, err = file.Write(buf)
 	if err != nil {
-		c.logger.Printf(err.Error())
 		return err
 	}
-
+	c.logIf("backup save in file: %s", filename)
 	ffjson.Pool(buf)
 	return nil
 }
@@ -159,14 +173,13 @@ func (c *cache) BackupRecovery() error {
 func (c *cache) BackupRecoveryFile(filename string) error {
 	buf, err := ioutil.ReadFile(filename)
 	if err != nil {
-		c.logger.Printf(err.Error())
 		return err
 	}
 
 	items := map[string]Item{}
 	err = ffjson.Unmarshal(buf, &items)
+	ffjson.Pool(buf)
 	if err != nil {
-		c.logger.Printf(err.Error())
 		return err
 	}
 
@@ -175,9 +188,14 @@ func (c *cache) BackupRecoveryFile(filename string) error {
 	for k, v := range items {
 		ov, found := c.items[k]
 		if !found || ov.Expired() {
+			if !c.haveSlot() {
+				return fmt.Errorf("no empty slot, for next items")
+			}
 			c.items[k] = v
+			c.size += sizeItem
 		}
 	}
+	c.logIf("backup load from file: %s", filename)
 	return nil
 }
 
@@ -189,6 +207,7 @@ func (c *cache) ItemCount() int {
 	c.mu.RLock()
 	n := len(c.items)
 	c.mu.RUnlock()
+	c.logIf("all items count: %d", n)
 	return n
 }
 
@@ -208,7 +227,12 @@ func (c *cache) Items() map[string]Item {
 		}
 		m[k] = v
 	}
+	c.logIf("unexpired items count: %d", len(m))
 	return m
+}
+
+func (c *cache) haveSlot() bool {
+	return c.maxSize-c.size > sizeItem
 }
 
 /*
@@ -216,7 +240,11 @@ func (c *cache) Items() map[string]Item {
 	(DefaultExpiration), the cache's default expiration time is used. If it is -1
 	(NoExpiration), the item never expires.
 */
-func (c *cache) Set(k string, x interface{}, d time.Duration) {
+func (c *cache) Set(k string, x interface{}, d time.Duration) error {
+	if !c.haveSlot() {
+		return fmt.Errorf("no empty slot, wait for janitor")
+	}
+
 	var e int64
 	if d == DefaultExpiration {
 		d = c.defaultExpiration
@@ -229,8 +257,11 @@ func (c *cache) Set(k string, x interface{}, d time.Duration) {
 		Value:      x,
 		Expiration: e,
 	}
+	c.size += sizeItem
 	c.mu.Unlock()
-	c.logger.Printf("set %s -> %v -> %s", k, x, d)
+
+	c.logIf("set %s -> %v <- %s", k, x, d)
+	return nil
 }
 
 /*
@@ -245,6 +276,9 @@ func (c *cache) SetDefault(k string, x interface{}) {
 	key, or if the existing item has expired. Returns an error otherwise.
 */
 func (c *cache) Add(k string, x interface{}, d time.Duration) error {
+	if !c.haveSlot() {
+		return fmt.Errorf("no empty slot, wait for janitor")
+	}
 	c.mu.Lock()
 	_, found := c.get(k)
 	if found {
@@ -253,7 +287,7 @@ func (c *cache) Add(k string, x interface{}, d time.Duration) error {
 	}
 	c.set(k, x, d)
 	c.mu.Unlock()
-	c.logger.Printf("add %s -> %v -> %s", k, x, d)
+	c.logIf("add %s -> %v <- %s", k, x, d)
 	return nil
 }
 
@@ -282,6 +316,7 @@ func (c *cache) set(k string, x interface{}, d time.Duration) {
 		Value:      x,
 		Expiration: e,
 	}
+	c.size += sizeItem
 }
 
 /*
@@ -300,7 +335,7 @@ func (c *cache) Get(k string) (interface{}, bool) {
 			return nil, false
 		}
 	}
-	c.logger.Printf("get %s -> %v", k, item.Value)
+	c.logIf("get %s -> %v", k, item.Value)
 	return item.Value, true
 }
 
@@ -322,7 +357,7 @@ func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 			return nil, time.Time{}, false
 		}
 	}
-	c.logger.Printf("get with %s -> %v", k, item.Value)
+	c.logIf("get with exp %s -> %v <- %s", k, item.Value, time.Unix(0, item.Expiration))
 	return item.Value, time.Unix(0, item.Expiration), true
 }
 
@@ -339,6 +374,6 @@ func (c *cache) Replace(k string, x interface{}, d time.Duration) error {
 	}
 	c.set(k, x, d)
 	c.mu.Unlock()
-	c.logger.Printf("replace with %s -> %v -> %s", k, x, d)
+	c.logIf("replace %s -> %v <- %s", k, x, d)
 	return nil
 }

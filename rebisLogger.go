@@ -36,3 +36,9 @@ func (c *cache) ChangeLogger(custom Logger) {
 		c.logger = custom
 	}
 }
+
+func (c *cache) logIf(format string, v ...interface{}) {
+	if c.logAll {
+		c.logger.Printf(format, v...)
+	}
+}

@@ -34,13 +34,13 @@ func stopBackup(c *Cache) {
 
 func (b *backup) run(c *cache) {
 	ticker := time.NewTicker(b.Interval)
-	c.logger.Printf("start cache backup with file save in %s and interval %s", b.Path, b.Interval)
+	c.logIf("start cache backup with file save in %s and interval %s", b.Path, b.Interval)
 	for {
 		select {
 		case <-ticker.C:
 			go c.BackupSave()
 		case <-b.stop:
-			c.logger.Printf("stop backup")
+			c.logIf("stop backup")
 			ticker.Stop()
 			return
 		}
