@@ -39,13 +39,5 @@ jobs:
       - name: Test
         run: |
           go test ./
-      - name: Upload coverage to codecov
-        run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
-          go get github.com/modocache/gover;
-          echo "" > coverage.txt
-          gover
-          cat gover.coverprofile >> coverage.txt
-          bash <(curl -s https://codecov.io/bash)
       - name: Build
         run: go build -v .
