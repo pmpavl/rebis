@@ -24,13 +24,13 @@ func stopJanitor(c *Cache) {
 
 func (j *janitor) run(c *cache) {
 	ticker := time.NewTicker(j.Interval)
-	c.logger.Printf("start cache janitor with interval %s", j.Interval)
+	c.logIf("start cache janitor with interval %s", j.Interval)
 	for {
 		select {
 		case <-ticker.C:
 			go c.DeleteExpired()
 		case <-j.stop:
-			c.logger.Printf("stop janitor")
+			c.logIf("stop janitor")
 			ticker.Stop()
 			return
 		}

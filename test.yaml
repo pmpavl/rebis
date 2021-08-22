@@ -4,4 +4,4 @@ backup:
 defaultExpiration: -1ns
 cleanupInterval: 5s
 logAll: false
-evicted: true
+evicted: false
