@@ -1,6 +1,7 @@
 package rebis
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"runtime"
@@ -8,6 +9,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/allegro/bigcache/v2"
+	"github.com/coocood/freecache"
 )
 
 var (
@@ -23,9 +27,31 @@ var (
 	}
 )
 
+const maxEntrySize = 256
+
 type TestStruct struct {
 	Num      int
 	Children []*TestStruct
+}
+
+func key(i int) string {
+	return fmt.Sprintf("key-%010d", i)
+}
+
+func value() []byte {
+	return make([]byte, 100)
+}
+
+func initBigCache(entriesInWindow int) *bigcache.BigCache {
+	cache, _ := bigcache.NewBigCache(bigcache.Config{
+		Shards:             256,
+		LifeWindow:         10 * time.Minute,
+		MaxEntriesInWindow: entriesInWindow,
+		MaxEntrySize:       maxEntrySize,
+		Verbose:            true,
+	})
+
+	return cache
 }
 
 func TestCache(t *testing.T) {
@@ -522,6 +548,32 @@ func benchmarkCacheGet(b *testing.B, exp time.Duration) {
 	}
 }
 
+func BenchmarkFreeCacheGet(b *testing.B) {
+	b.StopTimer()
+	cache := freecache.NewCache(b.N * maxEntrySize)
+	for i := 0; i < b.N; i++ {
+		cache.Set([]byte(key(i)), value(), 0)
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		cache.Get([]byte(key(i)))
+	}
+}
+
+func BenchmarkBigCacheGet(b *testing.B) {
+	b.StopTimer()
+	cache := initBigCache(b.N)
+	for i := 0; i < b.N; i++ {
+		cache.Set(key(i), value())
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		cache.Get(key(i))
+	}
+}
+
 func BenchmarkRWMutexMapGet(b *testing.B) {
 	b.StopTimer()
 	m := map[string]string{
@@ -596,6 +648,40 @@ func benchmarkCacheGetConcurrent(b *testing.B, exp time.Duration) {
 		}()
 	}
 	wg.Wait()
+}
+
+func BenchmarkBigCacheGetConcurrent(b *testing.B) {
+	b.StopTimer()
+	cache := initBigCache(b.N)
+	for i := 0; i < b.N; i++ {
+		cache.Set(key(i), value())
+	}
+
+	b.StartTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		counter := 0
+		for pb.Next() {
+			cache.Get(key(counter))
+			counter = counter + 1
+		}
+	})
+}
+
+func BenchmarkFreeCacheGetConcurrent(b *testing.B) {
+	b.StopTimer()
+	cache := freecache.NewCache(b.N * maxEntrySize)
+	for i := 0; i < b.N; i++ {
+		cache.Set([]byte(key(i)), value(), 0)
+	}
+
+	b.StartTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		counter := 0
+		for pb.Next() {
+			cache.Get([]byte(key(counter)))
+			counter = counter + 1
+		}
+	})
 }
 
 func BenchmarkRWMutexMapGetConcurrent(b *testing.B) {
@@ -682,6 +768,19 @@ func benchmarkCacheSet(b *testing.B, exp time.Duration) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		tc.Set("foo", "bar", DefaultExpiration)
+	}
+}
+func BenchmarkFreeCacheSet(b *testing.B) {
+	cache := freecache.NewCache(b.N * maxEntrySize)
+	for i := 0; i < b.N; i++ {
+		cache.Set([]byte(key(i)), value(), 0)
+	}
+}
+
+func BenchmarkBigCacheSet(b *testing.B) {
+	cache := initBigCache(b.N)
+	for i := 0; i < b.N; i++ {
+		cache.Set(key(i), value())
 	}
 }
 
