@@ -102,7 +102,7 @@ What conclusions can be drawn from this benchmark data:
 - Get: rebis implementation is faster and makes fewer memory allocations than bigcache, freecache.
 - Get Concurrent: rebis implementation is faster and makes fewer memory allocations than bigcache, freecache.
 - Set: rebis many times faster than freecache and bigcache, but have more memory allocations.
-But you need to remember that freecache and bigcache libraries with more functionality than rebis at this stage.
+>But you need to remember that freecache and bigcache libraries with more functionality than rebis at this stage.
 
 ### References
 - [go-cache](https://github.com/patrickmn/go-cache) - An in-memory key:value store/cache (similar to Memcached) library for Go, suitable for single-machine applications.
