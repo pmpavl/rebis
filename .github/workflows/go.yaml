@@ -30,14 +30,23 @@ jobs:
           export PATH=$PATH:$(go env GOPATH)/bin
           go get -u golang.org/x/lint/golint
           golint ./...
+
       - name: Static code check
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
           go get -u github.com/gordonklaus/ineffassign
           ineffassign .
           go vet ./...
+
       - name: Test
         run: |
           go test ./
+
+      - name: Run coverage
+        run: go test -race -coverprofile=coverage.txt -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        run: bash <(curl -s https://codecov.io/bash)
+
       - name: Build
         run: go build -v .
