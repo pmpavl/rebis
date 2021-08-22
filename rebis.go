@@ -53,6 +53,13 @@ func NewCache(config *Config) (*Cache, error) {
 }
 
 /*
+	Create new rebis cache from config struct and reuse map items.
+*/
+func NewCacheFrom(config *Config, items map[string]Item) (*Cache, error) {
+	return newCache(config, items)
+}
+
+/*
 	Init cache struct with default logger (stdout).
 
 	Run backup if inUse = true in config file with backup interval
@@ -94,6 +101,15 @@ func newCache(config *Config, items map[string]Item) (*Cache, error) {
 }
 
 /*
+	Custom function onEvicted.
+*/
+func (c *cache) OnEvicted(f func(string, interface{})) {
+	c.mu.Lock()
+	c.onEvicted = f
+	c.mu.Unlock()
+}
+
+/*
 	Delete all expired items from the cache.
 */
 func (c *cache) DeleteExpired() {
@@ -117,10 +133,26 @@ func (c *cache) DeleteExpired() {
 }
 
 /*
+	Delete an item from the cache. Does nothing if the key is not in the cache.
+*/
+func (c *cache) Delete(k string) {
+	c.mu.Lock()
+	v, evicted := c.delete(k)
+	c.mu.Unlock()
+	if evicted {
+		c.onEvicted(k, v)
+	}
+	c.logIf("delete %s -> %v", k, v)
+}
+
+/*
 	Delete item by key, return his value and if have evicted function
 	then true else false.
 */
 func (c *cache) delete(k string) (interface{}, bool) {
+	defer func() {
+		c.size -= sizeItem
+	}()
 	if c.onEvicted != nil {
 		if v, found := c.items[k]; found {
 			delete(c.items, k)
@@ -129,6 +161,15 @@ func (c *cache) delete(k string) (interface{}, bool) {
 	}
 	delete(c.items, k)
 	return nil, false
+}
+
+/*
+	Delete all items from the cache.
+*/
+func (c *cache) Flush() {
+	c.mu.Lock()
+	c.items = map[string]Item{}
+	c.mu.Unlock()
 }
 
 /*
@@ -253,11 +294,14 @@ func (c *cache) Set(k string, x interface{}, d time.Duration) error {
 		e = time.Now().Add(d).UnixNano()
 	}
 	c.mu.Lock()
+	_, ok := c.get(k)
+	if !ok {
+		c.size += sizeItem
+	}
 	c.items[k] = Item{
 		Value:      x,
 		Expiration: e,
 	}
-	c.size += sizeItem
 	c.mu.Unlock()
 
 	c.logIf("set %s -> %v <- %s", k, x, d)
