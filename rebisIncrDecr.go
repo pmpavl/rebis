@@ -6,7 +6,7 @@ import (
 )
 
 /*
-	Returns true if the item has expired.
+	Expired returns true if the item has expired.
 */
 func (item Item) Expired() bool {
 	if item.Expiration == 0 {

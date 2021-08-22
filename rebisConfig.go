@@ -10,18 +10,25 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+/*
+	Config for create cache.
+*/
 type Config struct {
-	Size              uintptr       `yaml:"size"`
-	Backup            Backup        `yaml:"backup"`
-	DefaultExpiration time.Duration `yaml:"defaultExpiration"`
-	CleanupInterval   time.Duration `yaml:"cleanupInterval"`
-	LogAll            bool          `yaml:"logAll"`
-	Evicted           bool          `yaml:"evicted"`
+	Size              uintptr       `yaml:"size"`              // how many elements should fit into the cache
+	Backup            Backup        `yaml:"backup"`            // meta backup
+	DefaultExpiration time.Duration `yaml:"defaultExpiration"` // default time of life element
+	CleanupInterval   time.Duration `yaml:"cleanupInterval"`   // interval for cleanup
+	LogAll            bool          `yaml:"logAll"`            // log in standard out or not
+	Evicted           bool          `yaml:"evicted"`           // do standard function with expired item
 }
+
+/*
+	Backup is configuration for backup logic.
+*/
 type Backup struct {
-	Path     string        `yaml:"path,omitempty"`
-	Interval time.Duration `yaml:"interval,omitempty"`
-	InUse    bool          `yaml:"inUse"`
+	Path     string        `yaml:"path,omitempty"`     // path to save backup, must be like "./backup"
+	Interval time.Duration `yaml:"interval,omitempty"` // interval for save backup, its hard operation
+	InUse    bool          `yaml:"inUse"`              // use backup save or not
 }
 
 func configDefault() *Config {
@@ -60,7 +67,7 @@ func ConfigCreateDefault(filename string) error {
 }
 
 /*
-	Parse config from yaml file configuration.
+	ConfigFrom parse config from yaml file configuration.
 */
 func ConfigFrom(filename string) (c *Config, err error) {
 	file, err := ioutil.ReadFile(filename)
