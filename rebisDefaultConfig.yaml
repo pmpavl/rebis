@@ -2,6 +2,6 @@ size: 1024
 backup:
     inUse: false
 defaultExpiration: -1ns
-cleanupInterval: 5s
+cleanupInterval: 5m0s
 logAll: false
-evicted: true
+evicted: false
