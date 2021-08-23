@@ -88,7 +88,7 @@ There is also an example of a default config file `rebisDefaultConfig.yaml` and 
 - Currently there is no support for deserialization of custom data types, this needs to be fixed. To do this, need to change the logic of saving backups.
 
 ## Benchmark
-Three caches were compared: [rebus](https://github.com/pmpavl/rebis), [bigcache](https://github.com/allegro/bigcache), [freecache](https://github.com/coocood/freecache) and map. Benchmark tests were made using an Ryzen 7 3700X CPU @ 3.60GHz with 32GB of RAM on Windows 21H1 (19043.1165).
+Three caches were compared: [rebis](https://github.com/pmpavl/rebis), [bigcache](https://github.com/allegro/bigcache), [freecache](https://github.com/coocood/freecache) and map. Benchmark tests were made using an Ryzen 7 3700X CPU @ 3.60GHz with 32GB of RAM on Windows 21H1 (19043.1165).
 ```
 go version go1.16.4 windows/amd64
 
