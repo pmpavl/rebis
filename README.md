@@ -2,11 +2,11 @@
 
 Key-value in-memory concurrent cache storage with: logger, backup save, auto collect expired element, limit on the maximum number of elements. All cache settings are set through the yaml config file. The elements are implemented as `map[string]Item` where Item is structure with fields Value: `interface{}` and Expiration time: `int64`.
 
-Requires Go 1.14 or newer.
+Requires Go 1.18 or newer.
 
 ## Usage
 ### Installation
-``` 
+```
 go get github.com/pmpavl/rebis
 ```
 ### Simple initialization
@@ -28,7 +28,7 @@ You can write a config file yourself, like the one below.
 ``` yaml
 size: 8196              # size of cache in MB
 backup:
-    path: "./backup"    # path to save backup 
+    path: "./backup"    # path to save backup
     interval: 1m        # interval backup
     inUse: true         # do backup or not
 defaultExpiration: -1ns # element standard lifetime
@@ -97,31 +97,31 @@ goarch: amd64
 pkg: github.com/pmpavl/rebis
 cpu: AMD Ryzen 7 3700X 8-Core Processor @ 3.60GHz
 
-BenchmarkCacheGetExpiring-16                            60389815                79.17 ns/op           48 B/op          2 allocs/op
-BenchmarkCacheGetNotExpiring-16                         78374000                68.50 ns/op           48 B/op          2 allocs/op
-BenchmarkFreeCacheGet-16                                 8444374               622.6 ns/op           136 B/op          3 allocs/op
-BenchmarkBigCacheGet-16                                 10803576               544.4 ns/op           152 B/op          4 allocs/op
-BenchmarkRWMutexMapGet-16                               467264154               10.21 ns/op            0 B/op          0 allocs/op
-BenchmarkRWMutexInterfaceMapGetStruct-16                146306853               32.83 ns/op            0 B/op          0 allocs/op
-BenchmarkRWMutexInterfaceMapGetString-16                176881310               26.67 ns/op            0 B/op          0 allocs/op
-BenchmarkCacheGetConcurrentExpiring-16                  105458304               45.49 ns/op           48 B/op          2 allocs/op
-BenchmarkCacheGetConcurrentNotExpiring-16               100000000               52.13 ns/op           48 B/op          2 allocs/op
-BenchmarkBigCacheGetConcurrent-16                       95998464               164.6 ns/op           152 B/op          4 allocs/op
-BenchmarkFreeCacheGetConcurrent-16                      49889566               220.8 ns/op           136 B/op          3 allocs/op
-BenchmarkRWMutexMapGetConcurrent-16                     280039142               17.10 ns/op            0 B/op          0 allocs/op
-BenchmarkCacheGetManyConcurrentExpiring-16              94455712                50.17 ns/op           47 B/op          1 allocs/op
-BenchmarkCacheGetManyConcurrentNotExpiring-16           100000000               44.32 ns/op           46 B/op          1 allocs/op
-BenchmarkCacheSetExpiring-16                            32226573               153.0 ns/op            72 B/op          3 allocs/op
-BenchmarkCacheSetNotExpiring-16                         42172146               118.5 ns/op            72 B/op          3 allocs/op
-BenchmarkFreeCacheSet-16                                 7916127               922.5 ns/op           347 B/op          2 allocs/op
-BenchmarkBigCacheSet-16                                  7725384               559.7 ns/op           345 B/op          2 allocs/op
-BenchmarkRWMutexMapSet-16                               229314998               20.94 ns/op            0 B/op          0 allocs/op
-BenchmarkCacheSetDelete-16                              20428626               245.4 ns/op           120 B/op          5 allocs/op
-BenchmarkRWMutexMapSetDelete-16                         100000000               47.57 ns/op            0 B/op          0 allocs/op
-BenchmarkCacheSetDeleteSingleLock-16                    100000000               46.57 ns/op            0 B/op          0 allocs/op
-BenchmarkRWMutexMapSetDeleteSingleLock-16               131097927               36.26 ns/op            0 B/op          0 allocs/op
-BenchmarkIncrementInt-16                                96997718                51.32 ns/op            8 B/op          1 allocs/op
-BenchmarkDeleteExpiredLoop-16                               4623           1048725 ns/op              67 B/op          0 allocs/op
+BenchmarkCacheGetExpiring-16                          60389815        79.17 ns/op         48 B/op        2 allocs/op
+BenchmarkCacheGetNotExpiring-16                       78374000        68.50 ns/op         48 B/op        2 allocs/op
+BenchmarkFreeCacheGet-16                               8444374        622.6 ns/op        136 B/op        3 allocs/op
+BenchmarkBigCacheGet-16                               10803576        544.4 ns/op        152 B/op        4 allocs/op
+BenchmarkRWMutexMapGet-16                            467264154        10.21 ns/op          0 B/op        0 allocs/op
+BenchmarkRWMutexInterfaceMapGetStruct-16             146306853        32.83 ns/op          0 B/op        0 allocs/op
+BenchmarkRWMutexInterfaceMapGetString-16             176881310        26.67 ns/op          0 B/op        0 allocs/op
+BenchmarkCacheGetConcurrentExpiring-16               105458304        45.49 ns/op         48 B/op        2 allocs/op
+BenchmarkCacheGetConcurrentNotExpiring-16            100000000        52.13 ns/op         48 B/op        2 allocs/op
+BenchmarkBigCacheGetConcurrent-16                     95998464        164.6 ns/op        152 B/op        4 allocs/op
+BenchmarkFreeCacheGetConcurrent-16                    49889566        220.8 ns/op        136 B/op        3 allocs/op
+BenchmarkRWMutexMapGetConcurrent-16                  280039142        17.10 ns/op          0 B/op        0 allocs/op
+BenchmarkCacheGetManyConcurrentExpiring-16            94455712        50.17 ns/op         47 B/op        1 allocs/op
+BenchmarkCacheGetManyConcurrentNotExpiring-16        100000000        44.32 ns/op         46 B/op        1 allocs/op
+BenchmarkCacheSetExpiring-16                          32226573        153.0 ns/op         72 B/op        3 allocs/op
+BenchmarkCacheSetNotExpiring-16                       42172146        118.5 ns/op         72 B/op        3 allocs/op
+BenchmarkFreeCacheSet-16                               7916127        922.5 ns/op        347 B/op        2 allocs/op
+BenchmarkBigCacheSet-16                                7725384        559.7 ns/op        345 B/op        2 allocs/op
+BenchmarkRWMutexMapSet-16                            229314998        20.94 ns/op          0 B/op        0 allocs/op
+BenchmarkCacheSetDelete-16                            20428626        245.4 ns/op        120 B/op        5 allocs/op
+BenchmarkRWMutexMapSetDelete-16                      100000000        47.57 ns/op          0 B/op        0 allocs/op
+BenchmarkCacheSetDeleteSingleLock-16                 100000000        46.57 ns/op          0 B/op        0 allocs/op
+BenchmarkRWMutexMapSetDeleteSingleLock-16            131097927        36.26 ns/op          0 B/op        0 allocs/op
+BenchmarkIncrementInt-16                              96997718        51.32 ns/op          8 B/op        1 allocs/op
+BenchmarkDeleteExpiredLoop-16                             4623      1048725 ns/op         67 B/op        0 allocs/op
 PASS
 ok      github.com/pmpavl/rebis 337.580s
 ```
