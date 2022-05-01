@@ -42,20 +42,19 @@ You can initialize config variable.
 import "github.com/pmpavl/rebis"
 
 config := &rebis.Config{
-		Size: 1024,
-		Backup: rebis.Backup{
-			InUse: false,
-		},
-		DefaultExpiration: time.Duration(-1),
-		CleanupInterval:   time.Duration(time.Minute * 5),
-		LogAll:            false,
-		Evicted:           false,
-	}
+	Size: 1024,
+	Backup: rebis.Backup{
+		InUse: false,
+	},
+	DefaultExpiration: time.Duration(-1),
+	CleanupInterval:   time.Duration(time.Minute * 5),
+	LogAll:            false,
+	Evicted:           false,
+}
 rebisCache, _ := rebis.NewCache(config)
-
 rebisCache.SetDefault("my-key", "my-value")
+
 v, _ := rebisCache.Get("my-key")
-fmt.Println(v)
 ```
 > Important, you need to remember that the backup.Path is specified as a folder, and then a file with a timestamp is created in the folder. Therefore, you need to specify exactly the path of the existing folder where will put the backups.
 
