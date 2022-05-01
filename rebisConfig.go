@@ -4,10 +4,17 @@ import (
 	"bytes"
 	"errors"
 	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
+)
+
+const (
+	DefaultSize              = 1024
+	DefaultDefaultExpiration = time.Duration(-1)
+	DefaultCleanupInterval   = time.Duration(time.Minute * 5)
 )
 
 /*
@@ -33,12 +40,12 @@ type Backup struct {
 
 func configDefault() *Config {
 	return &Config{
-		Size: 1024,
+		Size: DefaultSize,
 		Backup: Backup{
 			InUse: false,
 		},
-		DefaultExpiration: time.Duration(-1),
-		CleanupInterval:   time.Duration(time.Minute * 5),
+		DefaultExpiration: DefaultDefaultExpiration,
+		CleanupInterval:   DefaultCleanupInterval,
 		LogAll:            false,
 		Evicted:           false,
 	}
@@ -52,17 +59,18 @@ func ConfigCreateDefault(filename string) error {
 	if !strings.Contains(filename, ".yaml") && !strings.Contains(filename, ".yml") {
 		return errors.New("config file should be in yaml format")
 	}
+
 	buf := new(bytes.Buffer)
 	c := configDefault()
 
-	err := yaml.NewEncoder(buf).Encode(c)
-	if err != nil {
+	if err := yaml.NewEncoder(buf).Encode(c); err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(filename, buf.Bytes(), 0644)
-	if err != nil {
+
+	if err := os.WriteFile(filename, buf.Bytes(), os.FileMode(0644)); err != nil { // nolint
 		return err
 	}
+
 	return nil
 }
 
@@ -74,9 +82,10 @@ func ConfigFrom(filename string) (c *Config, err error) {
 	if err != nil {
 		return nil, err
 	}
-	err = yaml.Unmarshal(file, &c)
-	if err != nil {
+
+	if err := yaml.Unmarshal(file, &c); err != nil {
 		return nil, err
 	}
+
 	return c, nil
 }

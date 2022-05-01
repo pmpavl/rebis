@@ -1,6 +1,6 @@
 size: 1024
 backup:
-    inUse: false
+  inUse: false
 defaultExpiration: -1ns
 cleanupInterval: 5m0s
 logAll: false

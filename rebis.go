@@ -18,7 +18,7 @@ type Item struct {
 	Expiration int64
 }
 
-// Cache is wrapper over hidden cache
+// Cache is wrapper over hidden cache.
 type Cache struct {
 	*cache
 }
@@ -42,8 +42,10 @@ type keyAndValue struct {
 }
 
 const (
-	NoExpiration      time.Duration = -1 // if expiration in Item = -1, then element never delete
-	DefaultExpiration time.Duration = 0  // if expiration in Set func = 0, then element expiration = config.defaultExpiration
+	// if expiration in Item = -1, then element never delete.
+	NoExpiration time.Duration = -1
+	// if expiration in Set func = 0, then element expiration = config.defaultExpiration.
+	DefaultExpiration time.Duration = 0
 	sizeItem          uintptr       = unsafe.Sizeof(Item{})
 )
 
@@ -70,7 +72,7 @@ func NewCacheFrom(config *Config, items map[string]Item) (*Cache, error) {
 */
 func newCache(config *Config, items map[string]Item) (*Cache, error) {
 	c := &cache{
-		maxSize:           config.Size * 1024,
+		maxSize:           config.Size * DefaultSize,
 		size:              0,
 		defaultExpiration: config.DefaultExpiration,
 		items:             items,
@@ -99,6 +101,7 @@ func newCache(config *Config, items map[string]Item) (*Cache, error) {
 	}
 
 	runtime.SetFinalizer(C, nil)
+
 	return C, nil
 }
 
@@ -116,8 +119,11 @@ func (c *cache) OnEvicted(f func(string, interface{})) {
 */
 func (c *cache) DeleteExpired() {
 	c.logIf("delete expired")
+
 	var evictedItems []keyAndValue
+
 	now := time.Now().UnixNano()
+
 	c.mu.Lock()
 	for k, v := range c.items {
 		if v.Expiration > 0 && now > v.Expiration {
@@ -141,9 +147,11 @@ func (c *cache) Delete(k string) {
 	c.mu.Lock()
 	v, evicted := c.delete(k)
 	c.mu.Unlock()
+
 	if evicted {
 		c.onEvicted(k, v)
 	}
+
 	c.logIf("delete %s -> %v", k, v)
 }
 
@@ -155,13 +163,17 @@ func (c *cache) delete(k string) (interface{}, bool) {
 	defer func() {
 		c.size -= sizeItem
 	}()
+
 	if c.onEvicted != nil {
 		if v, found := c.items[k]; found {
 			delete(c.items, k)
+
 			return v.Value, true
 		}
 	}
+
 	delete(c.items, k)
+
 	return nil, false
 }
 
@@ -188,20 +200,26 @@ func (c *cache) BackupSaveFile(filename string) error {
 	c.mu.Lock()
 	buf, err := ffjson.Marshal(&c.items)
 	c.mu.Unlock()
+
 	if err != nil {
 		return err
 	}
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755) // nolint
 	if err != nil {
 		return err
 	}
+
 	defer file.Close()
-	_, err = file.Write(buf)
-	if err != nil {
+
+	if _, err := file.Write(buf); err != nil {
 		return err
 	}
+
 	c.logIf("backup save in file: %s", filename)
+
 	ffjson.Pool(buf)
+
 	return nil
 }
 
@@ -224,23 +242,28 @@ func (c *cache) BackupRecoveryFile(filename string) error {
 	items := map[string]Item{}
 	err = ffjson.Unmarshal(buf, &items)
 	ffjson.Pool(buf)
+
 	if err != nil {
 		return err
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	for k, v := range items {
 		ov, found := c.items[k]
 		if !found || ov.Expired() {
 			if !c.haveSlot() {
 				return fmt.Errorf("no empty slot, for next items")
 			}
+
 			c.items[k] = v
 			c.size += sizeItem
 		}
 	}
+
 	c.logIf("backup load from file: %s", filename)
+
 	return nil
 }
 
@@ -253,6 +276,7 @@ func (c *cache) ItemCount() int {
 	n := len(c.items)
 	c.mu.RUnlock()
 	c.logIf("all items count: %d", n)
+
 	return n
 }
 
@@ -264,15 +288,19 @@ func (c *cache) Items() map[string]Item {
 	defer c.mu.RUnlock()
 	m := make(map[string]Item, len(c.items))
 	now := time.Now().UnixNano()
+
 	for k, v := range c.items {
 		if v.Expiration > 0 {
 			if now > v.Expiration {
 				continue
 			}
 		}
+
 		m[k] = v
 	}
+
 	c.logIf("unexpired items count: %d", len(m))
+
 	return m
 }
 
@@ -291,17 +319,20 @@ func (c *cache) Set(k string, x interface{}, d time.Duration) error {
 	}
 
 	var e int64
+
 	if d == DefaultExpiration {
 		d = c.defaultExpiration
 	}
+
 	if d > 0 {
 		e = time.Now().Add(d).UnixNano()
 	}
+
 	c.mu.Lock()
-	_, ok := c.get(k)
-	if !ok {
+	if _, ok := c.get(k); !ok {
 		c.size += sizeItem
 	}
+
 	c.items[k] = Item{
 		Value:      x,
 		Expiration: e,
@@ -309,6 +340,7 @@ func (c *cache) Set(k string, x interface{}, d time.Duration) error {
 	c.mu.Unlock()
 
 	c.logIf("set %s -> %v <- %s", k, x, d)
+
 	return nil
 }
 
@@ -327,15 +359,17 @@ func (c *cache) Add(k string, x interface{}, d time.Duration) error {
 	if !c.haveSlot() {
 		return fmt.Errorf("no empty slot, wait for janitor")
 	}
+
 	c.mu.Lock()
-	_, found := c.get(k)
-	if found {
-		c.mu.Unlock()
+	defer c.mu.Unlock()
+
+	if _, found := c.get(k); found {
 		return fmt.Errorf("item %s already exists", k)
 	}
+
 	c.set(k, x, d)
-	c.mu.Unlock()
 	c.logIf("add %s -> %v <- %s", k, x, d)
+
 	return nil
 }
 
@@ -344,26 +378,32 @@ func (c *cache) get(k string) (interface{}, bool) {
 	if !found {
 		return nil, false
 	}
+
 	if item.Expiration > 0 {
 		if time.Now().UnixNano() > item.Expiration {
 			return nil, false
 		}
 	}
+
 	return item.Value, true
 }
 
 func (c *cache) set(k string, x interface{}, d time.Duration) {
 	var e int64
+
 	if d == DefaultExpiration {
 		d = c.defaultExpiration
 	}
+
 	if d > 0 {
 		e = time.Now().Add(d).UnixNano()
 	}
+
 	c.items[k] = Item{
 		Value:      x,
 		Expiration: e,
 	}
+
 	c.size += sizeItem
 }
 
@@ -374,16 +414,21 @@ func (c *cache) set(k string, x interface{}, d time.Duration) {
 func (c *cache) Get(k string) (interface{}, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	item, found := c.items[k]
+
 	if !found {
 		return nil, false
 	}
+
 	if item.Expiration > 0 {
 		if time.Now().UnixNano() > item.Expiration {
 			return nil, false
 		}
 	}
+
 	c.logIf("get %s -> %v", k, item.Value)
+
 	return item.Value, true
 }
 
@@ -396,16 +441,21 @@ func (c *cache) Get(k string) (interface{}, bool) {
 func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	item, found := c.items[k]
+
 	if !found {
 		return nil, time.Time{}, false
 	}
+
 	if item.Expiration > 0 {
 		if time.Now().UnixNano() > item.Expiration {
 			return nil, time.Time{}, false
 		}
 	}
+
 	c.logIf("get with exp %s -> %v <- %s", k, item.Value, time.Unix(0, item.Expiration))
+
 	return item.Value, time.Unix(0, item.Expiration), true
 }
 
@@ -415,13 +465,14 @@ func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 */
 func (c *cache) Replace(k string, x interface{}, d time.Duration) error {
 	c.mu.Lock()
-	_, found := c.get(k)
-	if !found {
-		c.mu.Unlock()
+	defer c.mu.Unlock()
+
+	if _, found := c.get(k); !found {
 		return fmt.Errorf("item %s doesn't exist", k)
 	}
+
 	c.set(k, x, d)
-	c.mu.Unlock()
 	c.logIf("replace %s -> %v <- %s", k, x, d)
+
 	return nil
 }

@@ -15,6 +15,7 @@ func runJanitor(c *cache, ci time.Duration) {
 		stop:     make(chan bool),
 	}
 	c.janitor = j
+
 	go j.run(c)
 }
 
@@ -25,6 +26,7 @@ func stopJanitor(c *Cache) {
 func (j *janitor) run(c *cache) {
 	ticker := time.NewTicker(j.Interval)
 	c.logIf("start cache janitor with interval %s", j.Interval)
+
 	for {
 		select {
 		case <-ticker.C:
@@ -32,6 +34,7 @@ func (j *janitor) run(c *cache) {
 		case <-j.stop:
 			c.logIf("stop janitor")
 			ticker.Stop()
+
 			return
 		}
 	}

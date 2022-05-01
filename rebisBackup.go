@@ -13,14 +13,13 @@ type backup struct {
 }
 
 func runBackup(c *cache, bp string, bi time.Duration) {
-	var err error
 	b := &backup{
 		Path:     bp + "/backup" + strconv.Itoa(int(time.Now().Unix())) + ".json",
 		Interval: bi,
 		stop:     make(chan bool),
 	}
-	_, err = os.Create(b.Path)
-	if err != nil {
+
+	if _, err := os.Create(b.Path); err != nil {
 		c.logger.Printf("can not open json file %s", err.Error())
 	}
 
@@ -35,6 +34,7 @@ func stopBackup(c *Cache) {
 func (b *backup) run(c *cache) {
 	ticker := time.NewTicker(b.Interval)
 	c.logIf("start cache backup with file save in %s and interval %s", b.Path, b.Interval)
+
 	for {
 		select {
 		case <-ticker.C:
@@ -42,6 +42,7 @@ func (b *backup) run(c *cache) {
 		case <-b.stop:
 			c.logIf("stop backup")
 			ticker.Stop()
+
 			return
 		}
 	}
