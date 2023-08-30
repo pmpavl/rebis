@@ -6,7 +6,7 @@ require (
 	github.com/allegro/bigcache/v2 v2.2.5
 	github.com/coocood/freecache v1.2.1
 	github.com/pquerna/ffjson v0.0.0-20190930134022-aa0246cd15f7
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.0
 )
 
 require (
